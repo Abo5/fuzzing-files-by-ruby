@@ -52,7 +52,7 @@ when "1"
   hits_output_file = File.join(__dir__, gets.chomp)
 
   # قراءة محتوى ملف errors-list.txt
-  errors_file = File.open("/Users/qppn/Desktop/Projects/fuzzing/errors-list.txt", "r")
+  errors_file = File.open(File.join(__dir__, "errors-list.txt"), "r")
   errors_list = errors_file.readlines.map(&:chomp)
   errors_file.close
 
