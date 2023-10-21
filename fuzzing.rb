@@ -1,5 +1,21 @@
+gems = ['httparty', 'securerandom', 'thread']
+
+def install_gems(gems)
+  gems.each do |gem|
+     success = system("gem install #{gem}")
+    if success
+      puts "Installed gem: #{gem}" 
+    else
+      puts "Failed to install gem: #{gem}"
+    end
+  end
+end
+
+install_gems(gems)
+
 require 'httparty'
 require 'securerandom'
+require 'thread'
 
 clearing = `clear`
 puts clearing
@@ -34,105 +50,113 @@ print "What do you want? Enter 1 or 2: "
 option = gets.chomp
 proxy_list = proxies = File.readlines(File.join(__dir__, 'proxy.txt'), chomp: true)
 
-case option
-when "1"
-  clearing = `clear`
-  puts clearing
-  puts logo
-
-  use_ssl = url.include?("https://")
-
-  print "Enter the number of random strings: "
-  count = gets.chomp.to_i
-
-  print "Enter the output file name for errors (e.g., Errors.txt): "
-  errors_output_file = File.join(__dir__, gets.chomp)
+thread = []
+loop do 
   
-  print "Enter the output file name for hits (e.g., Hits.txt): "
-  hits_output_file = File.join(__dir__, gets.chomp)
+threads << Thread.new {
+  case option
+  when "1"
+    clearing = `clear`
+    puts clearing
+    puts logo
 
-  # قراءة محتوى ملف errors-list.txt
-  errors_file = File.open(File.join(__dir__, "errors-list.txt"), "r")
-  errors_list = errors_file.readlines.map(&:chomp)
-  errors_file.close
+    use_ssl = url.include?("https://")
 
-  File.open(errors_output_file, "a") do |file|
-    count.times do
-      random = SecureRandom.hex
+    print "Enter the number of random strings: "
+    count = gets.chomp.to_i
+
+    print "Enter the output file name for errors (e.g., Errors.txt): "
+    errors_output_file = File.join(__dir__, gets.chomp)
+
+    print "Enter the output file name for hits (e.g., Hits.txt): "
+    hits_output_file = File.join(__dir__, gets.chomp)
+
+    # قراءة محتوى ملف errors-list.txt
+    errors_file = File.open(File.join(__dir__, "errors-list.txt"), "r")
+    errors_list = errors_file.readlines.map(&:chomp)
+    errors_file.close
+
+    File.open(errors_output_file, "a") do |file|
+      count.times do
+        random = SecureRandom.hex
+        proxy_list.each do |proxy|
+          proxy_host, proxy_port = proxy.split(":")
+          begin
+            response = HTTParty.get("#{url}#{random}", verify: use_ssl, http_proxyaddr: proxy_host, http_proxyport: proxy_port)
+            if response.code == 200
+              if errors_list.any? { |error| response.body.include?(error) }
+                puts "\e[38;2;255;0;0m[-] Error Skipping...!\e[0m"
+                next  # التخطي إلى التالي إذا تم العثور على أي خطأ متطابق
+              else
+                puts "[+] URL: #{url}#{random}"
+                File.open(hits_output_file, "a") do |file|
+                  file.puts response
+                end
+              end
+            else
+              puts "[-] #{random} - Error Code: \e[38;2;255;0;0m#{response.code}\e[0m"
+            end
+          rescue StandardError => e
+            puts "[-] #{random} - Error: #{e.message}"
+          end
+        end
+      end
+    end
+
+  when "2"
+    clearing = `clear`
+    puts clearing
+    puts logo
+
+    #print " Enter the name of the wordlist, e.g., (file.txt): "
+    list = File.join(__dir__, "wordlist.txt")
+
+    print "Enter the output file name for errors (e.g., Errors.txt): "
+    errors_output_file = File.join(__dir__, gets.chomp)
+
+    print "Enter the output file name for hits (e.g., Hits.txt): "
+    hits_output_file = File.join(__dir__, gets.chomp)
+
+    use_ssl = url.include?("https://")
+
+    # قراءة محتوى ملف errors-list.txt
+    errors_file = File.open(File.join(__dir__, "errors-list.txt"), "r")
+    errors_list = errors_file.readlines.map(&:chomp)
+    errors_file.close
+
+    File.open(list, "r").each_line do |line|
+      file = line.chomp
       proxy_list.each do |proxy|
         proxy_host, proxy_port = proxy.split(":")
         begin
-          response = HTTParty.get("#{url}#{random}", verify: use_ssl, http_proxyaddr: proxy_host, http_proxyport: proxy_port)
+          response = HTTParty.get("#{url}#{file}", verify: use_ssl, http_proxyaddr: proxy_host, http_proxyport: proxy_port)
+          sleep(0.00005)
+
           if response.code == 200
             if errors_list.any? { |error| response.body.include?(error) }
               puts "\e[38;2;255;0;0m[-] Error Skipping...!\e[0m"
-              next  # التخطي إلى التالي إذا تم العثور على أي خطأ متطابق
+              File.open(errors_output_file, "a") do |file|
+                file.puts response
+              end
             else
-              puts "[+] URL: #{url}#{random}"
+              puts "[+] URL: #{url}#{file} - \e[38;2;0;255;0m#{response.code}\e[0m"
               File.open(hits_output_file, "a") do |file|
                 file.puts response
               end
             end
           else
-            puts "[-] #{random} - Error Code: \e[38;2;255;0;0m#{response.code}\e[0m"
+            puts "[-] #{file} - Error Code: \e[38;2;255;0;0m#{response.code}\e[0m"
           end
         rescue StandardError => e
-          puts "[-] #{random} - Error: #{e.message}"
+          puts "[-] #{file} - Error: #{e.message}"
         end
       end
     end
-  end
 
-when "2"
-  clearing = `clear`
-  puts clearing
-  puts logo
-
-  print " Enter the name of the wordlist, e.g., (file.txt): "
-  list = File.join(__dir__, gets.chomp)
-
-  print "Enter the output file name for errors (e.g., Errors.txt): "
-  errors_output_file = File.join(__dir__, gets.chomp)
-
-  print "Enter the output file name for hits (e.g., Hits.txt): "
-  hits_output_file = File.join(__dir__, gets.chomp)
-
-  use_ssl = url.include?("https://")
-
-  # قراءة محتوى ملف errors-list.txt
-  errors_file = File.open(File.join(__dir__, "errors-list.txt"), "r")
-  errors_list = errors_file.readlines.map(&:chomp)
-  errors_file.close
-
-  File.open(list, "r").each_line do |line|
-    file = line.chomp
-    proxy_list.each do |proxy|
-      proxy_host, proxy_port = proxy.split(":")
-      begin
-        response = HTTParty.get("#{url}#{file}", verify: use_ssl, http_proxyaddr: proxy_host, http_proxyport: proxy_port)
-        sleep(0.00005)
-
-        if response.code == 200
-          if errors_list.any? { |error| response.body.include?(error) }
-            puts "\e[38;2;255;0;0m[-] Error Skipping...!\e[0m"
-            File.open(errors_output_file, "a") do |file|
-              file.puts response
-            end
-          else
-            puts "[+] URL: #{url}#{file} - \e[38;2;0;255;0m#{response.code}\e[0m"
-            File.open(hits_output_file, "a") do |file|
-              file.puts response
-            end
-          end
-        else
-          puts "[-] #{file} - Error Code: \e[38;2;255;0;0m#{response.code}\e[0m"
-        end
-      rescue StandardError => e
-        puts "[-] #{file} - Error: #{e.message}"
-      end
-    end
-  end
-
-else
-  puts "[-] Invalid option."
+  else
+    puts "[-] Invalid option."
+  end 
+  }
 end
+
+threads.each(&:join)ع
