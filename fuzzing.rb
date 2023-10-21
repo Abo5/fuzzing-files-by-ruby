@@ -159,4 +159,4 @@ threads << Thread.new {
   }
 end
 
-threads.each(&:join)ع
+threads.each(&:join)
